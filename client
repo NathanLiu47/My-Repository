@@ -1,0 +1,1001 @@
+import java.util.*;
+import javafx.stage.Stage;
+import javafx.application.Application;
+import javafx.scene.*;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.event.ActionEvent;
+import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontPosture;
+import javafx.event.*;
+import javafx.collections.*;
+import java.io.*;
+
+public class client extends Application{
+    
+    private person p,dad, mom,spo,fatherD,fatherM,motherD,motherM,Sdad,Smom;
+    private address pAdd,sAdd,dAdd,mAdd;
+    private int pChdNum,fChdNum;
+    private TextField n,a,fn,mn,sn,stNa,stNum,postC,suburb,chdNumTf;
+    private RadioButton male,female;
+    private ArrayList<person> children;
+    
+    private TreeView<person> orgTree;
+    
+    private void createUI(Stage topView){
+        System.out.println("createUI is running");
+        
+        topView.setTitle("Family Tree");
+        //Scene and layout manager
+        GridPane gPane = new GridPane();
+        ScrollPane Sp = new ScrollPane(gPane); 
+        Scene uiContainer=new Scene(Sp);
+        topView.setScene(uiContainer);
+        
+        Label l1=new Label("Welcome to use Family Tree application!");
+        l1.setFont(new Font("Arial", 22));
+        gPane.add(l1,0,0);
+        
+        //set buttons with their event handler
+        Button load=new Button("Load a tree");
+        Button save=new Button("Save the tree");
+        Button create=new Button("Create a new tree");
+        create.setOnAction(evtInfo->renewTree());
+        load.setOnAction(evtInfo->loadInTree());
+        save.setOnAction(evtInfo->saveTree());
+        
+        //set top box to carry above buttons
+        HBox menuBox = new HBox(10);
+        menuBox.setPadding(new Insets(10));
+        menuBox.getChildren().addAll(create,save,load);
+        gPane.add(menuBox,0,1);
+        
+        //set middle box to carry tree veiw and information
+        HBox tAndI = new HBox(10);
+        tAndI.setMaxWidth(500);
+        tAndI.setPadding(new Insets(10));
+        VBox treeBox=new VBox(30);
+        
+        createTree();
+        orgTree.setOnMouseClicked(evt->showPerson(evt));
+        
+        VBox inputBox=new VBox(5);
+        inputBox.setMaxSize(250,500);
+        inputBox.getChildren().add(new Label("If you don't have this member,"));
+        inputBox.getChildren().add(new Label("please leave it as EMPTY."));
+        inputBox.getChildren().add(new Label("Name:"));
+        n = new TextField();
+        inputBox.getChildren().add(n);
+        
+        inputBox.getChildren().add(new Label("Gender:"));
+        ToggleGroup genderGrp=new ToggleGroup();
+        male=new RadioButton("Male");
+        male.setSelected(true);
+        male.setToggleGroup(genderGrp);
+        female=new RadioButton("Female");
+        female.setToggleGroup(genderGrp);
+        HBox gBox = new HBox(10);
+        gBox.getChildren().addAll(male,female);
+        inputBox.getChildren().add(gBox);
+        
+        inputBox.getChildren().add(new Label("Age:"));
+        a = new TextField();
+        inputBox.getChildren().add(a);
+        
+        inputBox.getChildren().add(new Label("Father Name:"));
+        fn = new TextField();
+        inputBox.getChildren().add(fn);
+        
+        inputBox.getChildren().add(new Label("Mother Name:"));
+        mn = new TextField();
+        inputBox.getChildren().add(mn);
+        
+        inputBox.getChildren().add(new Label("Spouse Name:"));
+        sn = new TextField();
+        inputBox.getChildren().add(sn);
+        
+        inputBox.getChildren().add(new Label("Address:"));
+        inputBox.getChildren().add(new Label("   Street Name:"));
+        stNa = new TextField();
+        inputBox.getChildren().add(stNa);
+        
+        inputBox.getChildren().add(new Label("   Street No.:"));
+        stNum = new TextField();
+        inputBox.getChildren().add(stNum);
+        
+        inputBox.getChildren().add(new Label("   Postcode:"));
+        postC = new TextField();
+        inputBox.getChildren().add(postC);
+        
+        inputBox.getChildren().add(new Label("   Suburb:"));
+        suburb = new TextField();
+        inputBox.getChildren().add(suburb);
+        
+        inputBox.getChildren().add(new Label("How many children?"));
+        chdNumTf=new TextField();
+        inputBox.getChildren().add(chdNumTf);
+        inputBox.getChildren().add(new Label(""));
+        
+        //set information bottom box to carry clear and add button
+        HBox bottomB = new HBox(40);
+        Button clear=new Button("clear");
+        clear.setOnAction(evtInfo->clear(evtInfo));
+        Button addT=new Button("Add");
+        addT.setOnAction(evtInfo->addPeople(evtInfo));
+        
+        bottomB.getChildren().add(clear);
+        bottomB.getChildren().add(addT);
+        inputBox.getChildren().add(bottomB);
+        
+        treeBox.getChildren().add(orgTree);
+        
+        
+        tAndI.getChildren().add(treeBox);
+        tAndI.getChildren().add(inputBox);
+        gPane.add(tAndI,0,3);
+        
+        
+        System.out.println("createUI is finish");
+    }
+    
+    //read file function
+    private void loadInTree(){
+        try (ObjectInputStream is = new ObjectInputStream(new FileInputStream("TreeView.txt"))) {
+            System.out.println("Start of loadInTree");
+            //make the root person 'p' as the person you read from file
+            p =(person) is.readObject();
+            updateTree();
+            
+            System.out.println("End of loadInTree");
+        } catch (FileNotFoundException e) {
+            System.out.println("Cannot open. The File is not found. "+e);
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println("Input Error. "+e);
+        }
+    }
+    
+    //write file fuction
+    private void saveTree(){
+        try (ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream("TreeView.txt"))) {
+            System.out.println("Start of saveTree");
+            //save the root person 'p' in a file
+            os.writeObject(p);
+
+            System.out.println("End of saveTree");
+        } catch (FileNotFoundException e) {
+            System.out.println("Cannot open. The File is not found. "+e);
+        } catch (IOException e) {
+            System.out.println("Input Error. "+e);
+        }
+    
+    }
+    
+    //the function is called by addPeople. it's used to edit 'p' which is the root people
+    private void editRootP(){
+        System.out.println("editRootP is running");
+        
+        
+        //edit information about 'p'
+        if(n.getText().isEmpty())
+            p.setName("Need person's Name");
+        else
+            p.setName(n.getText());
+        if(male.isSelected())
+            p.setgender("Male");
+        else
+            p.setgender("Female");
+        p.setage(a.getText());
+        if(fn.getText().isEmpty())
+            dad.setName("Need Father's Name");
+        else
+            dad.setName(fn.getText());
+        if(mn.getText().isEmpty())
+            mom.setName("Need Mother's Name");
+        else
+            mom.setName(mn.getText());
+        if(sn.getText().isEmpty())
+            spo.setName("name");
+        else
+            spo.setName(sn.getText());
+        //set p's dad, mom, spouse
+        p.setFather(dad);
+        p.setMother(mom);
+        p.setSpouse(spo);
+        
+        //set p'address
+        pAdd.setStrName(stNa.getText());
+        pAdd.setStrNum(stNum.getText());
+        pAdd.setPostcode(postC.getText());
+        pAdd.setSuburb(suburb.getText());
+        p.setAddress(pAdd);
+        //printAnything(p.getAddress());
+        //set p'children basic on what number you type in the text field
+        if(children==null){//if ArrayList Children equal to null
+            if(chdNumTf.getText().isEmpty())//if the text field is null,
+                pChdNum=0;                  //then the children number is 0
+            else{                           //else create child basic on the number
+                pChdNum=Integer.parseInt(chdNumTf.getText());
+                for(int a=0;a<pChdNum;a++){
+                    person child = new person();
+                    child.setName("Child "+(a+1));
+                    child.setFather(p);
+                    child.setMother(spo);
+                    person cSpo=new person();
+                    child.setSpouse(cSpo);
+                    children.add(a,child);
+                }
+            }
+        }
+        else{
+            if(chdNumTf.getText().isEmpty()){
+                pChdNum=0;
+                children.clear();
+            }
+            else{
+                pChdNum=Integer.parseInt(chdNumTf.getText());
+                //if the text field number is bigger or equal ArrayList children's size
+                if(pChdNum>=children.size()){
+                    for(int i=children.size()+1;i<pChdNum;i++){
+                       person child = new person();
+                       child.setName("Child "+i);
+                       child.setFather(p);
+                        child.setMother(spo);
+                        person cSpo=new person();
+                        child.setSpouse(cSpo);
+                        children.add(child); 
+                    }
+                }
+                else{
+                    children.clear();
+                    pChdNum=Integer.parseInt(chdNumTf.getText());
+                    for(int a=0;a<pChdNum;a++){
+                        person child = new person();
+                        child.setName("Child "+(a+1));
+                        child.setFather(p);
+                        child.setMother(spo);
+                        person cSpo=new person();
+                        child.setSpouse(cSpo);
+                        children.add(a,child);
+                    }
+                }
+            }
+        }
+            
+        updateTree();
+       
+        System.out.println("editRootP is finish");
+    }
+    
+    //edit dad method
+    private void editDad(){
+        System.out.println("editDad is running");
+        //if father's father is null, new one
+        if(fatherD==null)
+            fatherD = new person();
+        //if father's mother is null, new one
+        if(fatherM==null)
+            fatherM = new person();
+        
+        //edit dad's information
+        if(n.getText().isEmpty())
+            dad.setName("Need father's Name");
+        else
+            dad.setName(n.getText());
+        
+        if(male.isSelected())
+            dad.setgender("Male");
+        else
+            dad.setgender("Female");
+        dad.setage(a.getText());
+        if(fn.getText().isEmpty())
+            fatherD.setName("Need GrandFather's Name");
+        else
+            fatherD.setName(fn.getText());
+        if(mn.getText().isEmpty())
+            fatherM.setName("Need GrandMother's Name");
+        else
+            fatherM.setName(mn.getText());
+        if(sn.getText().isEmpty())
+            mom.setName("Need Spouse's Name");
+        else
+            mom.setName(sn.getText());
+        //set father's dad, mom, spo
+        dad.setFather(fatherD);
+        dad.setMother(fatherM);
+        dad.setSpouse(mom);
+        
+        //set father's address
+        dAdd.setStrName(stNa.getText());
+        dAdd.setStrNum(stNum.getText());
+        dAdd.setPostcode(postC.getText());
+        dAdd.setSuburb(suburb.getText());
+        dad.setAddress(dAdd);
+        //printAnything(dad.getAddress());
+        
+        fChdNum=Integer.parseInt(chdNumTf.getText());
+        //renew father in the root person      
+        p.setFather(dad);
+        updateTree();
+        
+        System.out.println("editDad is finish");
+    }
+    
+    //edit mom method
+    private void editMom(){
+        System.out.println("editMom is running");
+        //if mother's father is null, new one
+        if(motherD==null)
+            motherD = new person();
+        //if mother's mother is null, new one
+        if(motherM==null)
+            motherM = new person();
+        
+        //edit mom's information
+        if(male.isSelected())
+            mom.setgender("Male");
+        else
+            mom.setgender("Female");
+        mom.setage(a.getText());
+        if(fn.getText().isEmpty())
+            motherD.setName("Need Grandfather's Name");
+        else
+            motherD.setName(fn.getText());
+        if(mn.getText().isEmpty())
+            motherM.setName("Need GrandMother's Name");
+        else
+            motherM.setName(mn.getText());
+        if(sn.getText().isEmpty())
+            dad.setName("Need Spouse's Name");
+        else
+            dad.setName(sn.getText());
+        //set mother's dad, mom, spo
+        mom.setFather(motherD);
+        mom.setMother(motherM);
+        mom.setSpouse(dad);
+        
+        //set mother's address
+        mAdd.setStrName(stNa.getText());
+        mAdd.setStrNum(stNum.getText());
+        mAdd.setPostcode(postC.getText());
+        mAdd.setSuburb(suburb.getText());
+        mom.setAddress(mAdd);
+        //printAnything(mom.getAddress());
+        
+        fChdNum=Integer.parseInt(chdNumTf.getText());
+        //renew monther in the root person    
+        p.setMother(mom);
+        updateTree();
+        System.out.println("editMom is finish");
+    }
+    
+    //edit spouse method
+    private void editSpo(){
+        System.out.println("editSpo is running");
+        //if spouse's father is null, new one
+        if(Sdad==null)
+            Sdad = new person();
+        //if spouse's mother is null, new one
+        if(Smom==null)
+            Smom = new person();
+        
+        //set spouse's information
+        if(male.isSelected())
+            spo.setgender("Male");
+        else
+            spo.setgender("Female");
+        spo.setage(a.getText());
+        if(fn.getText().isEmpty())
+            Sdad.setName("Need father's Name");
+        else
+            Sdad.setName(fn.getText());
+        if(mn.getText().isEmpty())
+            Smom.setName("Need Mother's Name");
+        else
+            Smom.setName(mn.getText());
+        if(sn.getText().isEmpty())
+            p.setName("Need Spouse's Name");
+        else
+            p.setName(sn.getText());
+        //set spouse's dad,mom,spo
+        spo.setFather(Sdad);
+        spo.setMother(Smom);
+        spo.setSpouse(p);
+        
+        //set spouse's address
+        sAdd.setStrName(stNa.getText());
+        sAdd.setStrNum(stNum.getText());
+        sAdd.setPostcode(postC.getText());
+        sAdd.setSuburb(suburb.getText());
+        spo.setAddress(sAdd);
+        //printAnything(spo.getAddress());
+        
+        //set children of spouse same as it in editRootPerson
+        if(children==null){
+            if(chdNumTf.getText().isEmpty())
+                pChdNum=0;
+            else{
+                pChdNum=Integer.parseInt(chdNumTf.getText());
+                for(int a=0;a<pChdNum;a++){
+                    person child = new person();
+                    child.setName("Child "+(a+1));
+                    child.setFather(p);
+                    child.setMother(spo);
+                    person cSpo=new person();
+                    child.setSpouse(cSpo);
+                    children.add(a,child);
+                    
+                }
+            }
+        }
+        else{
+            if(chdNumTf.getText().isEmpty()){
+                pChdNum=0;
+                children.clear();
+            }
+            else{
+                pChdNum=Integer.parseInt(chdNumTf.getText());
+                if(pChdNum>children.size()){
+                    for(int i=children.size()+1;i<=pChdNum;i++){
+                       person child = new person();
+                       child.setName("Child "+i);
+                       child.setFather(p);
+                        child.setMother(spo);
+                        person cSpo=new person();
+                        child.setSpouse(cSpo);
+                        children.add(child); 
+                    }
+                }else{
+                    children.clear();
+                    pChdNum=Integer.parseInt(chdNumTf.getText());
+                    for(int a=0;a<pChdNum;a++){
+                        person child = new person();
+                        child.setName("Child "+(a+1));
+                        child.setFather(p);
+                        child.setMother(spo);
+                        person cSpo=new person();
+                        child.setSpouse(cSpo);
+                        children.add(a,child);
+                    }
+                }
+            }
+                
+        }
+        
+        //set spouse in root person 'p'    
+        p.setSpouse(spo);
+        updateTree();
+        System.out.println("editSpo is finish");
+    }
+    
+    //edit child method
+    private void editChd(int index){
+        System.out.println("editChd is running");
+        
+        //create child's address, spouse and its children arraylist
+        int cChildNum=0;
+        person cSpo = new person();
+        ArrayList<person> chdChdList=new ArrayList<>();
+        address cAdd=new address();
+        //set child's information
+        if(male.isSelected())
+            children.get(index).setgender("Male");
+        else
+            children.get(index).setgender("Female");
+        children.get(index).setage(a.getText());
+        if(fn.getText().isEmpty())
+            p.setName("Need father's Name");
+        else
+            p.setName(fn.getText());
+        if(mn.getText().isEmpty())
+            spo.setName("Need Mother's Name");
+        else
+            spo.setName(mn.getText());
+        if(sn.getText().isEmpty())
+            cSpo.setName("name");
+        else
+            cSpo.setName(sn.getText());
+        //set child's dad,mom,spo
+        children.get(index).setFather(p);
+        children.get(index).setMother(spo);
+        children.get(index).setSpouse(cSpo);
+        //set child's address
+        cAdd.setStrName(stNa.getText());
+        cAdd.setStrNum(stNum.getText());
+        cAdd.setPostcode(postC.getText());
+        cAdd.setSuburb(suburb.getText());
+        children.get(index).setAddress(cAdd);
+        //set this child's children list
+        if(chdChdList==null){
+            if(chdNumTf.getText().isEmpty())
+                cChildNum=0;
+            else{
+                cChildNum=Integer.parseInt(chdNumTf.getText());
+                for(int a=0;a<cChildNum;a++){
+                    person gchild = new person();
+                    gchild.setName("Grandchild "+a+1);
+                    gchild.setFather(children.get(index));
+                    gchild.setMother(children.get(index).getSpouse());
+                    chdChdList.add(gchild);
+                    //printAnything(gchild);
+                    
+                }
+            }
+        }
+        else{
+            if(chdNumTf.getText().isEmpty()){
+                cChildNum=0;
+                chdChdList.clear();
+            }
+            else{
+                cChildNum=Integer.parseInt(chdNumTf.getText());
+                if(cChildNum<chdChdList.size()){
+                    chdChdList.clear();
+                    cChildNum=Integer.parseInt(chdNumTf.getText());
+                    for(int a=0;a<cChildNum;a++){
+                        person gchild = new person();
+                        gchild.setName("Grandchild "+a+1);
+                        gchild.setFather(children.get(index));
+                        gchild.setMother(children.get(index).getSpouse());
+                        chdChdList.add(gchild);
+                        //printAnything(gchild);
+                    }
+                }else{
+                    for(int i=chdChdList.size()+1;i<=cChildNum;i++){
+                        person gchild = new person();
+                        gchild.setName("Grandchild "+i);
+                        gchild.setFather(children.get(index));
+                        gchild.setMother(children.get(index).getSpouse());
+                        
+                        chdChdList.add(gchild); 
+                        //printAnything(gchild);
+                    }
+                }
+            }
+        }
+        //set the child's children list in the child
+        children.get(index).setChildren(chdChdList);    
+        updateTree();
+        System.out.println("editChd is finish");
+    }
+    
+    //edit grandchildren
+    private person editGrandChd(int chdIndex, person gchd){
+        System.out.println("editGrandChd is running");
+        //create grandchild's address, spouse and its children arraylist
+        person gcSpo = new person();
+        ArrayList<person> gchdChdList=new ArrayList<>();
+        int gchdChdNum=0;
+        address gcAdd=new address();
+        //set grandchild's imformation
+        if(male.isSelected())
+            gchd.setgender("Male");
+        else
+            gchd.setgender("Female");
+        gchd.setage(a.getText());
+        if(fn.getText().isEmpty())
+            children.get(chdIndex).setName("Need father's Name");
+        else
+            children.get(chdIndex).setName(fn.getText());
+        if(mn.getText().isEmpty())
+            children.get(chdIndex).getSpouse().setName("Need Mother's Name");
+        else
+            children.get(chdIndex).getSpouse().setName(mn.getText());
+        if(sn.getText().isEmpty())
+            gcSpo.setName("name");
+        else
+            gcSpo.setName(sn.getText());
+        gchd.setFather(children.get(chdIndex));
+        gchd.setMother(children.get(chdIndex).getSpouse());
+        gchd.setSpouse(gcSpo);
+        //set grandchild's address
+        gcAdd.setStrName(stNa.getText());
+        gcAdd.setStrNum(stNum.getText());
+        gcAdd.setPostcode(postC.getText());
+        gcAdd.setSuburb(suburb.getText());
+        gchd.setAddress(gcAdd);
+        
+        //set grandchild's children list
+        if(gchdChdList==null){
+            if(chdNumTf.getText().isEmpty())
+                gchdChdNum=0;
+            else{
+                gchdChdNum=Integer.parseInt(chdNumTf.getText());
+                for(int a=0;a<gchdChdNum;a++){
+                    person gchild = new person();
+                    gchild.setName("Grand-Grandchild "+a+1);
+                    gchild.setFather(gchd);
+                    gchild.setMother(gchd.getSpouse());
+                    
+                    gchdChdList.add(gchild);
+                    //printAnything(gchild);
+                }
+            }
+        }
+        else{
+            if(chdNumTf.getText().isEmpty()){
+                gchdChdNum=0;
+                gchdChdList.clear();
+            }
+            else{
+                gchdChdNum=Integer.parseInt(chdNumTf.getText());
+                if(gchdChdNum<gchdChdList.size()){
+                    gchdChdList.clear();
+                    gchdChdNum=Integer.parseInt(chdNumTf.getText());
+                    for(int a=0;a<gchdChdNum;a++){
+                        person gchild = new person();
+                        gchild.setName("Grand-Grandchild "+a+1);
+                        gchild.setFather(gchd);
+                        gchild.setMother(gchd.getSpouse());
+                        gchdChdList.add(gchild);
+                        //printAnything(gchild);
+                    }
+                }else{
+                    
+                    for(int i=gchdChdList.size()+1;i<=gchdChdNum;i++){
+                        person gchild = new person();
+                        gchild.setName("Grand-Grandchild "+i);
+                        gchild.setFather(gchd);
+                        gchild.setMother(gchd.getSpouse());
+                        
+                        gchdChdList.add(gchild); 
+                        //printAnything(gchild);
+                    }
+                }
+            }
+        }
+        //set the children list under this grandchild
+        gchd.setChildren(gchdChdList);  
+        
+        updateTree();
+        System.out.println("editGandChd is finish");
+        return gchd;
+    }
+    
+    //when the "Add" button is pressed, the method is called
+    public void addPeople(ActionEvent e){
+        System.out.println("addPeople is running");
+        //if the root person is null, then create the root person base on what are in textfields
+        if(p==null){
+            p= new person();
+            dad=new person();
+            mom=new person();
+            spo=new person();
+            pAdd = new address();
+            sAdd = new address();
+            mAdd = new address();
+            dAdd = new address();
+            children=new ArrayList<>();
+            dad.setAddress(dAdd);
+            mom.setAddress(mAdd);
+            spo.setAddress(sAdd);
+            if(n.getText().isEmpty())
+                p.setName("Need person's Name");
+            else
+                p.setName(n.getText());
+            if(male.isSelected())
+                p.setgender("Male");
+            else
+                p.setgender("Female");
+            p.setage(a.getText());
+            if(fn.getText().isEmpty())
+                dad.setName("Need Father's Name");
+            else
+                dad.setName(fn.getText());
+            if(mn.getText().isEmpty())
+                mom.setName("Need Mother's Name");
+            else
+                mom.setName(mn.getText());
+            if(sn.getText().isEmpty())
+                spo.setName("name");
+            else
+                spo.setName(sn.getText());
+            p.setFather(dad);
+            p.setMother(mom);
+            p.setSpouse(spo);
+            p.setChildren(children);
+        
+            
+            pAdd.setStrName(stNa.getText());
+            pAdd.setStrNum(stNum.getText());
+            pAdd.setPostcode(postC.getText());
+            pAdd.setSuburb(suburb.getText());
+            p.setAddress(pAdd);
+            
+            if(chdNumTf.getText().isEmpty())
+                pChdNum=0;
+            else{
+                pChdNum=Integer.parseInt(chdNumTf.getText());
+                for(int a=0;a<pChdNum;a++){
+                    person child = new person();
+                    child.setName("Child "+(a+1));
+                    child.setFather(p);
+                    child.setMother(spo);
+                    person cSpo=new person();
+                    child.setSpouse(cSpo);
+                    children.add(a,child);
+                }
+            }
+            updateTree();
+        }
+        else if(n.getText().equals(p.getName())){//if the name text field 'n' equal p's name, then call that method
+            editRootP();
+        }
+        else if(n.getText().equals(dad.getName())){//if the name text field 'n' equal dad's name, then call that method
+            editDad();
+        }
+        else if(n.getText().equals(mom.getName())){//if the name text field 'n' equal mom's name, then call that method
+            editMom();
+        }
+        else if(n.getText().equals(spo.getName())){//if the name text field 'n' equal spo's name, then call that method
+            editSpo();
+        }
+        for(int i=0;i<children.size();i++){
+                if(n.getText().equals(children.get(i).getName())){//if the name text field 'n' equal child's name, then call that method
+                    editChd(i);
+                }
+                person chd=children.get(i);
+                if(chd.getChildren()!=null){
+                    for(int a=0;a<chd.getChildren().size();a++){
+                        person gChd=(person)chd.getChildren().get(a);
+                        if(n.getText().equals(gChd.getName())){//if the name text field 'n' equal grandchild's name, then call that method
+                            
+                            gChd=editGrandChd(i,gChd);
+                        }
+                    }
+                }
+            }
+        
+        System.out.println("addPeople is finish");
+    }
+    
+    //when user click the item in the tree view, this method is called
+    public void showPerson(Event evt){
+        System.out.println("showPerson is running");
+        //get the item which user clicked    
+        TreeView<person> tree=(TreeView<person>)evt.getSource();
+        ObservableList<TreeItem<person>> selectedItems =tree.getSelectionModel().getSelectedItems();
+        
+        person selectedP= null;
+        
+        
+        //System.out.println("Number of selected items: " + selectedItems.size());
+        //set the item equal to 'selectedP'
+        selectedP = selectedItems.get(0).getValue();
+        //System.out.println(selectedP.hashCode());
+        
+        //get the information from selectedP to the textfields
+        n.setText(selectedP.getName());
+        a.setText(selectedP.getage());
+        if(selectedP.getGender()=="Male")
+            male.setSelected(true);
+        else
+            female.setSelected(true);
+        if(selectedP.getFather()==null)
+            fn.setText("Null");
+        else
+            fn.setText(selectedP.getFather().getName());
+        if(selectedP.getMother()==null)
+            mn.setText("Null");
+        else
+            mn.setText(selectedP.getMother().getName());
+        if(selectedP.getSpouse()==null)
+            sn.setText("Null");
+        else
+            sn.setText(selectedP.getSpouse().getName());
+        if(selectedP.getAddress()==null){
+            stNa.setText("Null");
+            stNum.setText("Null");
+            postC.setText("Null");
+            suburb.setText("Null");
+        }else{
+            //printAnything(selectedP.getName());
+            //System.out.println("Address instance is: " +selectedP.getAddress().hashCode());
+            //printAnything(selectedP.getAddress());
+            stNa.setText(selectedP.getAddress().getStrName());
+            stNum.setText(selectedP.getAddress().getStrNum());
+            postC.setText(selectedP.getAddress().getPostcode());
+            suburb.setText(selectedP.getAddress().getSuburb());
+        }
+        
+        //get the children numbers from selectedP    
+        if(selectedP==p||selectedP==spo)
+            chdNumTf.setText(Integer.toString(pChdNum));
+        else if(selectedP==dad||selectedP==mom)
+            chdNumTf.setText(Integer.toString(fChdNum));
+        else if(selectedP.getChildren()==null)
+            chdNumTf.setText("0");
+        else if(selectedP.getChildren().get(0)!=null)
+            chdNumTf.setText(Integer.toString(selectedP.getChildren().size()));
+        System.out.println("showPerson is finished");
+    }
+    
+    //update edited person to the tree
+    public void updateTree(){
+        System.out.println("updateTree is running");
+        
+        TreeItem<person> treeRoot=createItem(p);
+        orgTree.setRoot(treeRoot);
+        
+        System.out.println("updateTree is finish");
+    }
+    
+    //create items or subtree in the tree
+    private TreeItem<person> createItem(person ou){
+        TreeItem<person> item=new TreeItem<>(ou);
+        TreeItem<person> parLabel=new TreeItem<>(new person("==Parent=="));
+        TreeItem<person> spoLabel=new TreeItem<>(new person("==Spouse=="));
+        TreeItem<person> chdLabel=new TreeItem<>(new person("==Children=="));
+        
+        item.getChildren().addAll(parLabel,spoLabel,chdLabel);
+        item.setExpanded(true);
+        parLabel.setExpanded(true);
+        spoLabel.setExpanded(true);
+        chdLabel.setExpanded(true);
+        if(ou.getFather()!=null){
+            TreeItem<person> father=new TreeItem<>(ou.getFather());
+            parLabel.getChildren().add(father);
+            
+        }
+        if(ou.getMother()!=null){
+            TreeItem<person> mother=new TreeItem<>(ou.getMother());
+            parLabel.getChildren().add(mother);
+        }
+        if(ou.getSpouse()!=null){
+            TreeItem<person> spouse=new TreeItem<>(ou.getSpouse());
+            spoLabel.getChildren().add(spouse);
+        }
+        if(ou.getChildren()!=null){
+            ArrayList<person> subUnits=ou.getChildren();
+            for(int i =0;i<subUnits.size();i++){
+                person oneSubUnit=subUnits.get(i);
+                TreeItem<person> oneSubTree=createItem(oneSubUnit);
+                chdLabel.getChildren().add(oneSubTree);
+                
+            }
+        }
+        
+        return item;
+    }
+    
+    //create a new tree when user need one
+    public void renewTree(){
+        System.out.println("renewTree is running");
+        //clear the children ArrayList
+        children.clear();
+        //create a new tree with its items
+        TreeItem<person> root= new TreeItem<>(new person("Person"));
+        person parentLabel=new person();
+        parentLabel.setName("Parents");
+        TreeItem<person> parent = new TreeItem<>(parentLabel);
+        TreeItem<person> dad= new TreeItem<>(new person("Father"));
+        TreeItem<person> mom= new TreeItem<>(new person("Mother"));
+        person spoLabel=new person();
+        spoLabel.setName("Spouse");
+        TreeItem<person> spouse = new TreeItem<>(spoLabel);
+        TreeItem<person> spo= new TreeItem<>(new person("Spouse"));
+        person chdLabel=new person();
+        chdLabel.setName("Children");
+        TreeItem<person> children = new TreeItem<>(chdLabel);
+        TreeItem<person> child = new TreeItem<>(new person("Chlid"));
+        person gChdLabel=new person();
+        gChdLabel.setName("Grandchildren");
+        TreeItem<person> grandChildren = new TreeItem<>(gChdLabel);
+        TreeItem<person> grandChild = new TreeItem<>(new person("Grandchild"));
+        root.getChildren().add(parent);
+        root.setExpanded(true);
+        parent.getChildren().add(dad);
+        parent.getChildren().add(mom);
+        parent.setExpanded(true);
+        root.getChildren().add(spouse);
+        spouse.getChildren().add(spo);
+        spouse.setExpanded(true);
+        root.getChildren().add(children);
+        children.getChildren().add(child);
+        children.setExpanded(true);
+        child.getChildren().add(grandChildren);
+        child.setExpanded(true);
+        grandChildren.getChildren().add(grandChild);
+        grandChildren.setExpanded(true);
+        orgTree.setRoot(root);
+        System.out.println("renewTree is finish");
+    }
+    
+    //create an enpty tree when the program start running
+    public void createTree(){
+        System.out.println("createTree is running");
+        person expP=new person();
+        expP.setName("Root Person");
+        person expD=new person();
+        expD.setName("Father's Name");
+        person expM=new person();
+        expM.setName("Mother's Name");
+        person expS=new person();
+        expS.setName("Spouse's Name");
+        person expchd=new person();
+        expchd.setName("Child's Name");
+        person expGchd=new person();
+        expGchd.setName("Grandchlid's Name");
+        TreeItem<person> root= new TreeItem<>(expP);
+        person parentLabel=new person();
+        parentLabel.setName("Parents");
+        TreeItem<person> parent = new TreeItem<>(parentLabel);
+        TreeItem<person> dad= new TreeItem<>(expD);
+        TreeItem<person> mom= new TreeItem<>(expM);
+        person spoLabel=new person();
+        spoLabel.setName("Spouse");
+        TreeItem<person> spouse = new TreeItem<>(spoLabel);
+        TreeItem<person> spo= new TreeItem<>(expS);
+        person chdLabel=new person();
+        chdLabel.setName("Children");
+        TreeItem<person> children = new TreeItem<>(chdLabel);
+        TreeItem<person> child = new TreeItem<>(expchd);
+        person gChdLabel=new person();
+        gChdLabel.setName("Grandchildren");
+        TreeItem<person> grandChildren = new TreeItem<>(gChdLabel);
+        TreeItem<person> grandChild = new TreeItem<>(expGchd);
+        root.getChildren().add(parent);
+        root.setExpanded(true);
+        parent.getChildren().add(dad);
+        parent.getChildren().add(mom);
+        parent.setExpanded(true);
+        root.getChildren().add(spouse);
+        spouse.getChildren().add(spo);
+        spouse.setExpanded(true);
+        root.getChildren().add(children);
+        children.getChildren().add(child);
+        children.setExpanded(true);
+        child.getChildren().add(grandChildren);
+        child.setExpanded(true);
+        grandChildren.getChildren().add(grandChild);
+        grandChildren.setExpanded(true);
+        orgTree = new TreeView<person>(root);
+        
+        System.out.println("createTree is finish");
+        
+    }
+    
+    //clear all the textfields
+    public void clear(ActionEvent e){
+        /*n,a,fn,mn,sn,cN,cA,cFn,cMn,cSn;
+    private RadioButton male,female,cMale,cFemale;
+    private RadioButton yes,no;*/
+        n.setText(null);
+        a.setText(null);
+        fn.setText(null);
+        mn.setText(null);
+        sn.setText(null);
+        male.setSelected(true);
+        chdNumTf.setText(null);
+        stNa.setText(null);
+        stNum.setText(null);
+        postC.setText(null);
+        suburb.setText(null);
+    }
+    
+    public void start(Stage topView){
+        createUI(topView);
+        topView.show();
+    }
+    private static person p1;
+    public static void main(String[]argv){
+        
+        launch(argv);
+    }
+    
+    
+    
+    // Testing / print out part
+    public static <T> void printAnything(T item){
+        System.out.println("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+        System.out.println(item.toString());
+    }
+    public static void printAnything(ArrayList item){
+        for(int i=0;i<item.size();i++){
+            System.out.println("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            System.out.println(item.get(i).toString());
+        }
+    }
+}
+
